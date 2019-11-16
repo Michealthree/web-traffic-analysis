@@ -1,4 +1,4 @@
-package com.zszprepaser;
+package com.zsz.prepaser;
 
 /**
  * 1.

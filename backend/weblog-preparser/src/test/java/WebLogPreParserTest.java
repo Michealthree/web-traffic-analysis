@@ -1,5 +1,5 @@
-import com.zszprepaser.PreParsedLog;
-import com.zszprepaser.WebLogPreParser;
+import com.zsz.prepaser.PreParsedLog;
+import com.zsz.prepaser.WebLogPreParser;
 import org.junit.Test;
 import static org.junit.Assert.*;
 public class WebLogPreParserTest {
