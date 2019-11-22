@@ -1,0 +1,132 @@
+--指标：浏览量(pv)
+select sum(pv_count) as pv_count from session where profile_id=702 and day=20180615;
+
+--指标：访客数
+select count(distinct(user_id)) as user_count from session where profile_id=702 and day=20180615;
+
+--指标：独立Ip数
+select count(distinct(client_ip)) as client_ip_count from session  where profile_id=702 and day=20180615;
+
+--指标：跳出率
+select round(sum(if(is_bounced, 1, 0)) / count(*),2) as bounced_rate from session where profile_id=702 and day=20180615;
+
+--指标：平均停留时间
+select round(sum(session_duration) / count(*),2) as avg_duration from session where profile_id=702 and day=20180615;
+
+--基本指标
+select 
+  sum(pv_count) as pv_count,
+  count(distinct(user_id)) as user_count,
+  count(distinct(client_ip)) as client_ip_count,
+  round(sum(if(is_bounced, 1, 0)) / count(*),2) as bounced_rate,
+  round(sum(session_duration) / count(*),2) as avg_duration
+from session
+where profile_id=702 and day=20180615;
+
+--从时间小时的维度剖析网站流量的基本指标
+select 
+  hour_of_day,
+  sum(pv_count) as pv_count,
+  count(distinct(user_id)) as user_count,
+  count(distinct(client_ip)) as client_ip_count,
+  round(sum(if(is_bounced, 1, 0)) / count(*),2) as bounced_rate,
+  round(sum(session_duration) / count(*),2) as avg_duration
+from session
+where profile_id=702 and day=20180615
+group by hour_of_day order by hour_of_day asc;
+
+--从时间天的维度剖析网站流量的基本指标
+select 
+  day,
+  sum(pv_count) as pv_count,
+  count(distinct(user_id)) as user_count,
+  count(distinct(client_ip)) as client_ip_count,
+  round(sum(if(is_bounced, 1, 0)) / count(*),2) as bounced_rate,
+  round(sum(session_duration) / count(*),2) as avg_duration
+from session
+where profile_id=702 and day between 20180615 and 20180623
+group by day order by day asc;
+
+--从来源类型的维度剖析网站流量的基本指标
+select 
+  source_type,
+  sum(pv_count) as pv_count,
+  count(distinct(user_id)) as user_count,
+  count(distinct(client_ip)) as client_ip_count,
+  round(sum(if(is_bounced, 1, 0)) / count(*),2) as bounced_rate,
+  round(sum(session_duration) / count(*),2) as avg_duration
+from session
+where profile_id=702 and day between 20180615 and 20180623
+group by source_type;
+
+--访问分析：
+with url_contribution as (
+  select page_view_referrer_url, count(*) as cnt
+  from pageview 
+  where profile_id=702 and day between 20180615 and 20180623
+  group by page_view_referrer_url)
+select 
+  page_url,
+  sum(pv_count) as pv_count,
+  count(distinct(user_id)) as user_count,
+  sum(if(is_exit_page, 1, 0)) as exit_page_count,
+  sum(nvl(cnt, 0)) as contribution_count,
+  round(sum(page_duration) / count(*),2) as avg_duration
+from pageview as pv left join url_contribution as uc on pv.page_url = uc.page_view_referrer_url
+where profile_id=702 and day between 20180615 and 20180623
+group by page_url;
+
+--转化分析
+select
+  day,
+  count(distinct(server_session_id)) as visits,
+  count(distinct(user_id)) as user_counts,
+  count(*) as conversion_counts,
+  round(count(*) / count(distinct(server_session_id)), 2) as conversion_rate,
+  sum(conversion_value) as conversion_values
+from conversion 
+group by day;
+
+--按浏览器的维度剖析
+select 
+  browser_brief,
+  sum(pv_count) as pv_count,
+  count(distinct(user_id)) as user_count,
+  count(distinct(client_ip)) as client_ip_count,
+  round(sum(if(is_bounced, 1, 0)) / count(*),2) as bounced_rate,
+  round(sum(session_duration) / count(*),2) as avg_duration
+from session
+where profile_id=702 and day between 20180615 and 20180623
+group by browser_brief;
+
+
+select 
+  country,
+  sum(pv_count) as pv_count,
+  count(distinct(user_id)) as user_count,
+  count(distinct(client_ip)) as client_ip_count,
+  round(sum(if(is_bounced, 1, 0)) / count(*),2) as bounced_rate,
+  round(sum(session_duration) / count(*),2) as avg_duration
+from session
+where profile_id=702 and day between 20180615 and 20180623
+group by country;
+
+
+--每天需要处理的数据量：
+1条日志 -> 1kb
+1.2亿pv -> 114G
+114G * 4 = 500G
+
+--真实环境的配置
+spark-submit --master yarn \
+--class com.twq.spark.web.WebETL \
+--driver-memory 10G \
+--executor-memory 24G \
+--num-executors 20 \
+--executor-cores 4 \
+--conf spark.web.etl.inputBaseDir=hdfs://master:9999/user/hive/warehouse/rawdata.db/web \
+--conf spark.web.etl.outputBaseDir=hdfs://master:9999/user/hadoop-zsz/traffic-analysis/web \
+--conf spark.web.etl.startDate=20180617 \
+--conf spark.driver.extraJavaOptions="-Dweb.metadata.mongodbAddr=192.168.1.102 -Dweb.etl.hbase.zk.quorums=master" \
+--conf spark.executor.extraJavaOptions="-Dweb.metadata.mongodbAddr=192.168.1.102 -Dweb.etl.hbase.zk.quorums=master -Dcom.sun.management.jmxremote.port=1119 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false" \
+/home/hadoop-zsz/traffice-analysis/jars/spark-sessionization-etl-1.0-SNAPSHOT-jar-with-dependencies.jar prod

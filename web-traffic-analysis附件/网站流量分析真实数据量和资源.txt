@@ -1,0 +1,50 @@
+--每天需要处理的数据量：
+1条日志 -> 1kb
+1.2亿pv -> 114G
+114G * 4 = 500G
+
+--真实环境的配置
+spark-submit --master yarn \
+--class com.twq.spark.web.WebETL \
+--driver-memory 10G \
+--executor-memory 24G \
+--num-executors 20 \
+--executor-cores 4 \
+--conf spark.web.etl.inputBaseDir=hdfs://master:9999/user/hive/warehouse/rawdata.db/web \
+--conf spark.web.etl.outputBaseDir=hdfs://master:9999/user/hadoop-twq/traffic-analysis/web \
+--conf spark.web.etl.startDate=20180617 \
+--conf spark.driver.extraJavaOptions="-Dweb.metadata.mongodbAddr=192.168.1.102 -Dweb.etl.hbase.zk.quorums=master" \
+--conf spark.executor.extraJavaOptions="-Dweb.metadata.mongodbAddr=192.168.1.102 -Dweb.etl.hbase.zk.quorums=master -Dcom.sun.management.jmxremote.port=1119 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false" \
+/home/hadoop-twq/traffice-analysis/jars/spark-sessionization-etl-1.0-SNAPSHOT-jar-with-dependencies.jar prod
+
+
+
+
+
+
+
+
+
+
+--数据存储在Hive中的数据量：
+rawdata.web  ==> 300G
+
+web.pageview  ==> 150G
+web.session   ==> 120G
+web.mouseclick  ==> 190G
+web.heatbeat   ==> 160G
+web.conversion  ==> 90G
+
+1天1T的数据
+
+--HBase中的数据量：
+每天2000万的user, 每一个user的信息大小为0.2KB
+总大小约为：4GB
+每天增量的user为500万左右的user，大小大概为：1GB左右
+
+
+
+--集群的规模：
+Hadoop集群：52个节点
+HBase集群：23个节点
+
